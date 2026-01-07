@@ -1,0 +1,42 @@
+/* Estoque - Estilos específicos */
+
+.estoque-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.estoque-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.estoque-summary {
+  padding: 1.5rem;
+  background: linear-gradient(135deg, var(--info-light), var(--info));
+  color: white;
+  border-radius: var(--radius-xl);
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.estoque-summary h3 {
+  margin: 0 0 0.5rem 0;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.alert-info {
+  background: rgba(6, 182, 212, 0.1);
+  color: var(--info-dark);
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  border-left: 4px solid var(--info);
+  margin-bottom: 1.5rem;
+}
+
+.page-container {
+  max-width: 1400px;
+}

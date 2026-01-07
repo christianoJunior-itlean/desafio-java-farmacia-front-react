@@ -1,0 +1,28 @@
+/* Clientes - Estilos específicos (usa shared.css para estilos base) */
+
+.badge-warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning-dark);
+  border: 1px solid var(--warning);
+}
+
+.ml-2 {
+  margin-left: 0.5rem;
+}
+
+small.text-warning {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.page-container {
+  max-width: 1400px;
+}

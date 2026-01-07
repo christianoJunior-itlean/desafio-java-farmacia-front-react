@@ -1,0 +1,28 @@
+/* Categorias - Estilos específicos (usa shared.css para estilos base) */
+
+/* Animações específicas */
+.page-container {
+  animation-delay: 0ms;
+}
+
+/* Customizações específicas da página de categorias */
+.categoria-row {
+  transition: all var(--transition-base);
+}
+
+.categoria-row:hover {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.03), transparent);
+}
+
+/* Ajustes de responsividade específicos */
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .page-header .btn {
+    width: 100%;
+  }
+}
