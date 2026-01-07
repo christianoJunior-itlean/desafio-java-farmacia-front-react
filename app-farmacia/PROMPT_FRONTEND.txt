@@ -1,0 +1,858 @@
+# PROMPT PARA GERAÇÃO DO FRONTEND - SISTEMA DE FARMÁCIA
+
+## CONTEXTO GERAL
+Você como um desenvolvedor frontend sênior especializado em React moderno, deve criar um frontend completo para um sistema de gerenciamento de farmácia. A API REST backend já está implementada em Java/Spring Boot e está rodando em **http://localhost:8080**. O frontend deve consumir essa API seguindo RIGOROSAMENTE todas as especificações de contrato de dados, validações e regras de negócio descritas abaixo.
+
+Seu objetivo é criar um frontend completo em React, organizado, escalável e pronto para integração com a API.
+Tecnologias e padrões obrigatórios
+React (versão mais recente)
+TypeScript
+Vite como bundler
+React Router para navegação
+Axios para requisições HTTP
+Gerenciamento de estado simples (Context API ou hooks)
+Estrutura de pastas baseada em responsabilidades
+Componentes funcionais
+Hooks customizados para integração com a API
+Variáveis de ambiente para URL do backend
+Código limpo, tipado e comentado apenas quando necessário
+
+Recomendo a seguinte estrutura de pastas:
+src/
+├── components/     // Componentes reutilizáveis (Botão, Input, etc.)
+├── pages/          // Componentes de página (Home, About, etc.)
+├── hooks/          // Custom Hooks
+├── contexts/       // Contextos (para gerenciamento de estado global)
+├── assets/         // Imagens, fontes, etc.
+├── styles/         // Estilos globais ou CSS Modules
+├── utils/          // Funções utilitárias
+└── App.js / App.tsx // Componente raiz
+
+## TECNOLOGIAS RECOMENDADAS
+- React.js
+- TypeScript
+- Axios ou Fetch para requisições HTTP
+- React Router ou Vue Router para navegação
+- UI Framework: Material-UI, Ant Design, Bootstrap ou Tailwind CSS
+- Gerenciamento de estado: Context API, Redux ou Pinia
+- Toastify ou similar para notificações/mensagens
+
+---
+
+## 1. AUTENTICAÇÃO E SEGURANÇA
+
+### 1.1 Endpoint de Login
+**POST** `/auth/login`
+
+**Request Body:**
+```json
+{
+  "username": "email@email.com",
+  "senha": "senha123"
+}
+```
+
+**Response (200):**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "tipo": "Bearer",
+  "username": "email@email.com"
+}
+```
+
+**REGRAS DE IMPLEMENTAÇÃO:**
+- O token deve ser armazenado (localStorage ou sessionStorage)
+- TODAS as requisições subsequentes devem incluir o header: `Authorization: Bearer {token}`
+- Se receber erro 401 ou 403, redirecionar para login
+- Implementar logout que limpa o token e redireciona para login
+- Mensagens de erro 403 devem exibir: "Acesso não autorizado. Você não tem permissão para acessar este recurso."
+
+---
+
+## 2. MEDICAMENTOS
+
+### 2.1 Listar Todos os Medicamentos
+**GET** `/medicamentos`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**IMPORTANTE:** Esta listagem **NÃO retorna** medicamentos que foram soft deleted (deletado=true). Medicamentos soft deleted não devem aparecer em nenhuma listagem.
+
+**Response (200):** Array de:
+```json
+{
+  "id": 1,
+  "nome": "Paracetamol",
+  "descricao": "Analgésico e antitérmico",
+  "dosagem": "500mg",
+  "preco": 15.50,
+  "ativo": true,
+  "categoria": {
+    "id": 1,
+    "nome": "Analgésicos"
+  },
+  "criadoEm": "2025-12-29T10:30:00"
+}
+```
+
+### 2.2 Buscar Medicamento por ID
+**GET** `/medicamentos/{id}`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**IMPORTANTE:** Se o medicamento foi soft deleted, retorna erro 404 (não encontrado).
+
+**Response (200):** Objeto do medicamento (mesmo formato acima)
+
+### 2.3 Listar Medicamentos por Categoria
+**GET** `/medicamentos/categoria/{categoriaId}`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**IMPORTANTE:** Esta listagem **NÃO retorna** medicamentos que foram soft deleted.
+
+**Response (200):** Array de medicamentos da categoria
+
+### 2.4 Criar Novo Medicamento
+**POST** `/medicamentos`
+
+**Headers:** `Authorization: Bearer {token}`, `Content-Type: application/json`
+
+**Request Body:**
+```json
+{
+  "nome": "Paracetamol",
+  "descricao": "Analgésico e antitérmico",
+  "dosagem": "500mg",
+  "preco": 15.50,
+  "ativo": true,
+  "categoriaId": 1
+}
+```
+
+**VALIDAÇÕES OBRIGATÓRIAS NO FRONTEND:**
+- `nome`: obrigatório, não vazio
+- `dosagem`: obrigatória, não vazia
+- `preco`: obrigatório, deve ser maior que zero (> 0)
+- `categoriaId`: opcional, mas se informado deve existir
+- `ativo`: opcional, padrão true
+- **IMPORTANTE:** O nome do medicamento é normalizado automaticamente pelo backend (sem acentos, lowercase). Dois medicamentos com dosagens diferentes PODEM ter o mesmo nome (ex: "Paracetamol 500mg" e "Paracetamol 750mg").
+
+**Response (201):** Objeto do medicamento criado
+
+**Possíveis Erros:**
+- 400: Validação falhou (exibir mensagem de erro do backend)
+- 409: Nome + dosagem já existe
+
+### 2.5 Atualizar Medicamento
+**PUT** `/medicamentos/{id}`
+
+**Headers:** `Authorization: Bearer {token}`, `Content-Type: application/json`
+
+**Request Body:** (mesmo formato do POST)
+
+**VALIDAÇÕES:** Mesmas do POST
+
+**IMPORTANTE:** Não é possível atualizar medicamentos que foram soft deleted. Retorna erro 400 com mensagem "Este medicamento foi inativado permanentemente e não pode ser alterado".
+
+**Response (200):** Objeto do medicamento atualizado
+
+**Possíveis Erros:**
+- 400: Este medicamento foi inativado permanentemente e não pode ser alterado
+
+### 2.6 Alterar Status do Medicamento (Ativar/Inativar)
+**PATCH** `/medicamentos/{id}/status`
+
+**Headers:** `Authorization: Bearer {token}`, `Content-Type: application/json`
+
+**Request Body:**
+```json
+{
+  "ativo": false
+}
+```
+
+**REGRA IMPORTANTE:**
+- Apenas a propriedade `ativo` deve ser enviada (boolean)
+- Este endpoint serve para ativar ou desativar medicamentos sem alterar outras propriedades
+- **NÃO é possível reativar** medicamentos que foram soft deleted (deletado=true)
+
+**Response (200):** Medicamento atualizado
+
+**Possíveis Erros:**
+- 400: Este medicamento foi inativado permanentemente e não pode ser reativado
+
+### 2.7 Deletar Medicamento
+**DELETE** `/medicamentos/{id}`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**REGRAS DE NEGÓCIO CRÍTICAS:**
+1. Se o medicamento **FOI VENDIDO** → Soft Delete (fica com ativo=false, softDeleted=true, NÃO pode ser reativado)
+2. Se o medicamento **NÃO foi vendido** mas tem movimentações de estoque → Delete físico (removido do banco)
+3. Se o medicamento **NÃO foi vendido e NÃO tem movimentações** → Delete físico
+
+**Response (200):**
+```json
+{
+  "message": "Medicamento inativado permanentemente (foi vendido anteriormente)"
+}
+```
+ou
+```json
+{
+  "message": "Medicamento deletado com sucesso"
+}
+```
+
+**Possíveis Erros:**
+- 404: Medicamento não encontrado
+
+---
+
+## 3. CATEGORIAS
+
+### 3.1 Listar Todas as Categorias
+**GET** `/categorias`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response (200):** Array de:
+```json
+{
+  "id": 1,
+  "nome": "Analgésicos"
+}
+```
+
+### 3.2 Buscar Categoria por ID
+**GET** `/categorias/{id}`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response (200):** Objeto da categoria
+
+### 3.3 Criar Nova Categoria
+**POST** `/categorias`
+
+**Headers:** `Authorization: Bearer {token}`, `Content-Type: application/json`
+
+**Request Body:**
+```json
+{
+  "nome": "Analgésicos"
+}
+```
+
+**VALIDAÇÕES:**
+- `nome`: obrigatório, não vazio, único (normalizado sem acentos)
+
+**Response (201):** Categoria criada
+
+### 3.4 Atualizar Categoria
+**PUT** `/categorias/{id}`
+
+**Headers:** `Authorization: Bearer {token}`, `Content-Type: application/json`
+
+**Request Body:** (mesmo formato do POST)
+
+**Response (200):** Categoria atualizada
+
+### 3.5 Deletar Categoria
+**DELETE** `/categorias/{id}`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**REGRA:** NÃO permite deletar categoria que está vinculada a medicamentos
+
+**Response (200):**
+```json
+{
+  "message": "Categoria deletada com sucesso"
+}
+```
+
+**Possíveis Erros:**
+- 400: Categoria possui medicamentos vinculados
+
+---
+
+## 4. CLIENTES
+
+### 4.1 Listar Todos os Clientes
+**GET** `/clientes`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response (200):** Array de:
+```json
+{
+  "id": 1,
+  "nomeCompleto": "João da Silva",
+  "cpf": "123.456.789-00",
+  "email": "joao@email.com",
+  "dataNascimento": "1990-05-15",
+  "nomeResponsavel": null
+}
+```
+
+### 4.2 Buscar Cliente por ID
+**GET** `/clientes/{id}`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response (200):** Objeto do cliente
+
+### 4.3 Criar Novo Cliente
+**POST** `/clientes`
+
+**Headers:** `Authorization: Bearer {token}`, `Content-Type: application/json`
+
+**Request Body:**
+```json
+{
+  "nomeCompleto": "João da Silva",
+  "cpf": "123.456.789-00",
+  "email": "joao@email.com",
+  "dataNascimento": "1990-05-15",
+  "nomeResponsavel": null
+}
+```
+
+**VALIDAÇÕES OBRIGATÓRIAS:**
+- `nomeCompleto`: obrigatório, não vazio
+- `cpf`: obrigatório, formato XXX.XXX.XXX-XX, deve ser válido (validar dígitos verificadores), único
+- `email`: obrigatório, formato válido, único
+- `dataNascimento`: obrigatória, deve ser data no passado
+- `nomeResponsavel`: **OBRIGATÓRIO** se o cliente for menor de 18 anos
+
+**REGRAS IMPORTANTES:**
+- Cliente menor de 18 anos pode ser cadastrado, mas **DEVE ter** um responsável
+- Cliente menor de 18 anos **NÃO pode realizar compras**
+- Validar CPF no frontend antes de enviar
+- Se menor de 18 anos e não informar responsável, exibir: "Cliente menor de 18 anos deve ter um responsável legal cadastrado"
+- Se menor de 18 anos e tentou comprar, exibir: "Cliente menor de idade não pode realizar compras. Este cadastro foi criado com um responsável para consulta."
+
+**Response (201):**
+```json
+{
+  "id": 1,
+  "nomeCompleto": "João da Silva",
+  "cpf": "123.456.789-00",
+  "email": "joao@email.com",
+  "dataNascimento": "1990-05-15",
+  "nomeResponsavel": null,
+  "message": "Cliente cadastrado com sucesso"
+}
+```
+
+### 4.4 Atualizar Cliente
+**PUT** `/clientes/{id}`
+
+**Headers:** `Authorization: Bearer {token}`, `Content-Type: application/json`
+
+**Request Body:** (mesmo formato do POST)
+
+**VALIDAÇÕES:** Mesmas do POST
+
+**Response (200):** Cliente atualizado
+
+---
+
+## 5. ESTOQUE
+
+### 5.1 Consultar Estoque de um Medicamento
+**GET** `/estoque/{medicamentoId}`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response (200):** Array de lotes:
+```json
+[
+  {
+    "id": 1,
+    "medicamentoId": 4,
+    "medicamentoNome": "Paracetamol",
+    "quantidadeAtual": 50,
+    "dataVencimento": "2026-12-31"
+  },
+  {
+    "id": 2,
+    "medicamentoId": 4,
+    "medicamentoNome": "Paracetamol",
+    "quantidadeAtual": 30,
+    "dataVencimento": "2027-06-30"
+  }
+]
+```
+
+**OBSERVAÇÃO:** Cada entrada no estoque representa um lote separado
+
+### 5.2 Registrar Entrada no Estoque
+**POST** `/estoque/entrada`
+
+**Headers:** `Authorization: Bearer {token}`, `Content-Type: application/json`
+
+**Request Body:**
+```json
+{
+  "medicamentoId": 4,
+  "quantidade": 100,
+  "dataVencimento": "2026-12-31",
+  "observacao": "LOTE-2025-001"
+}
+```
+
+**VALIDAÇÕES:**
+- `medicamentoId`: obrigatório
+- `quantidade`: obrigatória, deve ser maior que zero (> 0)
+- `dataVencimento`: obrigatória, **deve ser futura** (não pode ser hoje ou no passado)
+- `observacao`: opcional, usado para identificar o número do lote
+
+**REGRAS:**
+- Cada entrada cria um novo lote no estoque
+- O mesmo medicamento pode ter vários lotes com datas de vencimento diferentes
+- Se não informar `observacao`, o sistema gera automaticamente
+
+**Response (200):**
+```json
+{
+  "message": "Entrada de estoque registrada com sucesso. Lote: LOTE-2025-001"
+}
+```
+
+**Possíveis Erros:**
+- 400: Data de vencimento deve ser futura
+- 404: Medicamento não encontrado
+
+### 5.3 Registrar Saída do Estoque
+**POST** `/estoque/saida`
+
+**Headers:** `Authorization: Bearer {token}`, `Content-Type: application/json`
+
+**Request Body:**
+```json
+{
+  "medicamentoId": 4,
+  "quantidade": 10,
+  "dataVencimento": null,
+  "observacao": "Venda manual"
+}
+```
+
+**VALIDAÇÕES:**
+- `medicamentoId`: obrigatório
+- `quantidade`: obrigatória, deve ser maior que zero
+- Não permitir saída se quantidade for maior que o estoque disponível total
+
+**REGRAS:**
+- A saída é feita automaticamente pelo sistema **FIFO** (First In, First Out)
+- O sistema remove primeiro dos lotes mais próximos de vencer
+- Pode consumir múltiplos lotes em uma única saída se necessário
+
+**Response (200):**
+```json
+{
+  "message": "Saída de estoque registrada com sucesso"
+}
+```
+
+**Possíveis Erros:**
+- 400: Estoque insuficiente
+
+---
+
+## 6. VENDAS
+
+### 6.1 Listar Todas as Vendas
+**GET** `/vendas`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response (200):** Array de:
+```json
+{
+  "id": 1,
+  "cliente": {
+    "id": 1,
+    "nomeCompleto": "João da Silva",
+    "cpf": "123.456.789-00",
+    "email": "joao@email.com",
+    "dataNascimento": "1990-05-15",
+    "nomeResponsavel": null
+  },
+  "dataHora": "2025-12-29T14:30:00",
+  "valorTotal": 45.50,
+  "itens": [
+    {
+      "id": 1,
+      "medicamentoId": 4,
+      "medicamentoNome": "Paracetamol",
+      "quantidade": 2,
+      "precoUnitario": 15.50,
+      "subtotal": 31.00
+    },
+    {
+      "id": 2,
+      "medicamentoId": 5,
+      "medicamentoNome": "Dipirona",
+      "quantidade": 1,
+      "precoUnitario": 14.50,
+      "subtotal": 14.50
+    }
+  ]
+}
+```
+
+### 6.2 Buscar Venda por ID
+**GET** `/vendas/{id}`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response (200):** Objeto da venda (mesmo formato acima)
+
+### 6.3 Listar Vendas de um Cliente
+**GET** `/vendas/cliente/{clienteId}`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response (200):** Array de vendas do cliente
+
+### 6.4 Criar Nova Venda
+**POST** `/vendas`
+
+**Headers:** `Authorization: Bearer {token}`, `Content-Type: application/json`
+
+**Request Body:**
+```json
+{
+  "clienteId": 1,
+  "itens": [
+    {
+      "medicamentoId": 4,
+      "quantidade": 2
+    },
+    {
+      "medicamentoId": 5,
+      "quantidade": 1
+    }
+  ]
+}
+```
+
+**VALIDAÇÕES OBRIGATÓRIAS:**
+- `clienteId`: obrigatório, cliente deve existir
+- `itens`: array obrigatório, **deve ter ao menos 1 item**
+- Para cada item:
+  - `medicamentoId`: obrigatório
+  - `quantidade`: obrigatória, deve ser maior que zero
+
+**REGRAS DE NEGÓCIO CRÍTICAS:**
+1. Cliente deve ter **mais de 18 anos**
+2. Medicamento deve estar **ativo** (ativo=true)
+3. Medicamento **NÃO pode estar vencido**
+4. Medicamento **NÃO pode estar soft deleted**
+5. Deve ter **estoque suficiente** (considera todos os lotes)
+6. O **preço unitário** usado é o preço atual do medicamento (não enviado no request)
+7. O **valor total** é calculado automaticamente pelo backend
+8. O estoque é **atualizado automaticamente** após a venda (usando FIFO)
+9. A venda usa o sistema **FIFO** - remove primeiro dos lotes mais próximos de vencer
+
+**Response (201):** Objeto da venda criada (formato completo)
+
+**Possíveis Erros:**
+- 400: Cliente é menor de idade
+- 400: Venda deve conter pelo menos um item
+- 400: Medicamento inativo não pode ser vendido
+- 400: Medicamento vencido não pode ser vendido
+- 400: Estoque insuficiente para o medicamento X
+- 404: Cliente não encontrado
+- 404: Medicamento não encontrado
+
+**DICA PARA UX:**
+- Antes de finalizar a venda, mostrar preview com:
+  - Lista de itens com nomes, quantidades e preços
+  - Valor total calculado
+  - Dados do cliente
+- Após sucesso, mostrar comprovante da venda
+
+---
+
+## 7. ALERTAS
+
+### 7.1 Alertas de Estoque Baixo
+**GET** `/alertas/estoque-baixo`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response (200):** Array de:
+```json
+{
+  "medicamentoId": 4,
+  "medicamentoNome": "Paracetamol",
+  "quantidadeAtual": 8,
+  "limiteBaixo": 10,
+  "preco": 15.50
+}
+```
+
+**REGRAS:**
+- Considera apenas medicamentos **ativos**
+- Limite configurado: **quantidade < 10** (padrão do sistema)
+- Mostra a soma de todos os lotes do medicamento
+
+### 7.2 Alertas de Validade Próxima
+**GET** `/alertas/validade-proxima`
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response (200):** Array de:
+```json
+{
+  "medicamentoId": 4,
+  "medicamentoNome": "Paracetamol",
+  "quantidade": 20,
+  "dataVencimento": "2026-01-15",
+  "diasParaVencer": 17
+}
+```
+
+**REGRAS:**
+- Considera apenas medicamentos **ativos**
+- Alerta para medicamentos que vencem nos próximos **30 dias** (padrão do sistema)
+- Cada alerta representa um lote específico
+- Medicamentos vencidos também aparecem (diasParaVencer negativo)
+
+**DICA PARA UX:**
+- Criar um dashboard com contadores de alertas
+- Destacar em vermelho medicamentos já vencidos
+- Destacar em amarelo medicamentos próximos do vencimento
+
+---
+
+## 8. TRATAMENTO DE ERROS
+
+### 8.1 Formato Padrão de Erro
+Todos os erros seguem o formato:
+```json
+{
+  "timestamp": "2025-12-29T14:30:00",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Mensagem detalhada do erro",
+  "path": "/medicamentos",
+  "details": null
+}
+```
+
+### 8.2 Códigos HTTP e Tratamentos
+
+**200 OK:** Sucesso
+**201 Created:** Recurso criado com sucesso
+**400 Bad Request:** Validação falhou ou regra de negócio violada
+- Exibir `message` para o usuário
+
+**401 Unauthorized:** Token inválido ou expirado
+- Redirecionar para login
+- Exibir: "Sessão expirada. Faça login novamente."
+
+**403 Forbidden:** Sem permissão
+- Exibir: "Acesso não autorizado. Você não tem permissão para acessar este recurso."
+
+**404 Not Found:** Recurso não encontrado
+- Exibir `message` ou "Recurso não encontrado"
+
+**409 Conflict:** Conflito (ex: nome duplicado)
+- Exibir `message`
+
+**500 Internal Server Error:** Erro no servidor
+- Exibir: "Erro interno do servidor. Tente novamente mais tarde."
+
+---
+
+## 9. ESPECIFICAÇÕES TÉCNICAS IMPORTANTES
+
+### 9.1 Formatos de Data
+- **Data:** formato ISO 8601 `YYYY-MM-DD` (ex: "2025-12-29")
+- **Data/Hora:** formato ISO 8601 `YYYY-MM-DDTHH:mm:ss` (ex: "2025-12-29T14:30:00")
+- No frontend, converter para formato brasileiro quando exibir: DD/MM/YYYY
+
+### 9.2 Formato de Valores Monetários
+- Backend envia/recebe como **number** (ex: 15.50)
+- Exibir no frontend formatado: R$ 15,50
+- Input aceita vírgula ou ponto, mas enviar como number
+
+### 9.3 Formato de CPF
+- Backend espera: XXX.XXX.XXX-XX (com pontos e hífen)
+- Implementar máscara no input
+- Validar dígitos verificadores antes de enviar
+
+### 9.4 Base URL
+```
+http://localhost:8080
+```
+
+### 9.5 Headers Padrão
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+---
+
+## 10. FUNCIONALIDADES DO FRONTEND
+
+### 10.1 Páginas Obrigatórias
+1. **Login** - Autenticação
+2. **Dashboard** - Visão geral com alertas
+3. **Medicamentos** - CRUD completo + listar por categoria
+4. **Categorias** - CRUD completo
+5. **Clientes** - CRUD completo
+6. **Estoque** - Entrada, saída, consulta
+7. **Vendas** - Criar venda, listar, detalhes
+8. **Alertas** - Estoque baixo e validade próxima
+
+### 10.2 Funcionalidades de UX
+- Loading indicators em todas as requisições
+- Mensagens de sucesso/erro com toast/snackbar
+- Confirmação antes de deletar
+- Validação em tempo real nos formulários
+- Máscara para CPF
+- Formatação de valores monetários
+- Formatação de datas
+- Filtros e busca nas listagens
+- Paginação nas listagens grandes
+- Responsivo (mobile-friendly)
+
+### 10.3 Validações do Frontend
+Implemente TODAS as validações descritas em cada endpoint para melhorar a experiência do usuário e reduzir chamadas desnecessárias ao backend.
+
+---
+
+## 11. FLUXOS IMPORTANTES
+
+### 11.1 Fluxo de Venda
+1. Selecionar cliente (validar se é maior de 18 anos)
+2. Adicionar itens ao carrinho
+   - Para cada item, validar estoque disponível
+   - Exibir preço atual do medicamento
+   - Calcular subtotal
+3. Mostrar preview da venda com valor total
+4. Confirmar e enviar para API
+5. Exibir comprovante
+6. Limpar carrinho
+
+### 11.2 Fluxo de Entrada de Estoque
+1. Selecionar medicamento
+2. Informar quantidade
+3. Informar data de vencimento (DEVE SER FUTURA)
+4. Opcionalmente informar número do lote
+5. Confirmar entrada
+6. Atualizar listagem de estoque
+
+### 11.3 Fluxo de Cadastro de Cliente Menor de Idade
+1. Preencher dados do cliente
+2. Informar data de nascimento
+3. Se menor de 18 anos → Campo "Responsável Legal" torna-se obrigatório
+4. Exibir aviso: "Este cliente é menor de idade e não poderá realizar compras"
+5. Salvar cliente
+
+---
+
+## 12. CASOS DE TESTE IMPORTANTES
+
+Teste os seguintes cenários no frontend:
+
+### Medicamentos
+- ✅ Criar medicamento com dosagem (ex: "Paracetamol 500mg")
+- ✅ Criar outro medicamento com mesmo nome mas dosagem diferente (ex: "Paracetamol 750mg")
+- ✅ Tentar criar com preço zero ou negativo (deve bloquear)
+- ✅ Alterar status (ativar/inativar)
+- ✅ Deletar medicamento não vendido (delete físico)
+- ✅ Deletar medicamento vendido (soft delete permanente)
+
+### Clientes
+- ✅ Cadastrar cliente maior de 18 anos sem responsável
+- ✅ Cadastrar cliente menor de 18 anos COM responsável
+- ✅ Tentar cadastrar menor de 18 anos SEM responsável (deve bloquear)
+- ✅ Tentar realizar venda para menor de 18 anos (deve bloquear)
+
+### Estoque
+- ✅ Adicionar lote com data de vencimento futura
+- ✅ Tentar adicionar lote com data passada (deve bloquear)
+- ✅ Consultar estoque com múltiplos lotes
+
+### Vendas
+- ✅ Criar venda com múltiplos itens
+- ✅ Tentar vender medicamento inativo (deve bloquear)
+- ✅ Tentar vender sem estoque (deve bloquear)
+- ✅ Verificar que estoque diminui após venda (FIFO)
+- ✅ Verificar que preço usado é o atual do medicamento
+
+### Alertas
+- ✅ Ver alertas de estoque baixo (< 10 unidades)
+- ✅ Ver alertas de validade próxima (< 30 dias)
+- ✅ Verificar que medicamentos inativos não aparecem nos alertas
+
+---
+
+## 13. OBSERVAÇÕES FINAIS
+
+1. **Normalização de Nomes:** O backend normaliza automaticamente nomes de medicamentos e categorias (remove acentos, converte para lowercase). O frontend pode fazer isso também para melhor UX, mas não é obrigatório.
+
+2. **Soft Delete:** Medicamentos que foram vendidos nunca são removidos do banco, apenas marcados como inativos e soft deleted. Eles não devem aparecer em listagens normais.
+
+3. **Sistema FIFO:** Vendas e saídas de estoque usam FIFO automaticamente - o frontend não precisa se preocupar com isso, mas pode exibir informações sobre os lotes.
+
+4. **Validações:** Implemente TODAS as validações no frontend para melhorar a UX, mas lembre-se que o backend também valida tudo.
+
+5. **Mensagens Amigáveis:** Use as mensagens do backend quando disponíveis, mas melhore a apresentação visual.
+
+6. **Testes:** Teste todos os fluxos, especialmente os casos extremos (menores de idade, estoque zero, medicamentos vencidos, etc.).
+
+---
+
+## COMECE IMPLEMENTANDO:
+1. Sistema de autenticação e rotas protegidas
+2. Layout base com menu de navegação
+3. Dashboard com resumo e alertas
+4. CRUD de Categorias (mais simples)
+5. CRUD de Medicamentos
+6. CRUD de Clientes (com validação de idade)
+7. Gestão de Estoque
+8. Sistema de Vendas
+9. Página de Alertas
+10. Refinamentos e melhorias de UX
+
+Requisitos funcionais do Frontend
+Criar serviços para comunicação com a API
+Centralizar chamadas HTTP
+Tratar erros de API (401, 403, 500, etc.)
+Criar páginas conforme os endpoints disponíveis
+Implementar autenticação, caso exista (login, logout, token, refresh se aplicável)
+Proteger rotas conforme permissões do usuário
+Criar formulários com validação básica
+Layout simples, funcional e organizado (sem foco em design avançado)
+
+Estrutura mínima esperada
+
+/src
+/api (configuração do axios e serviços)
+/auth (contexto de autenticação, guards)
+/pages
+/components
+/hooks
+/routes
+/types
+/utils
+
+Instruções finais
+Gere o projeto completo, desde a criação até a integração com a API
+Mostre exemplos reais de consumo dos endpoints
+Utilize TypeScript de forma correta
+Não invente regras de backend: use exclusivamente o que foi informado
+Caso alguma regra esteja ausente, assuma o padrão mais comum e documente a suposição no código
+
+Boa sorte! 🚀
+
