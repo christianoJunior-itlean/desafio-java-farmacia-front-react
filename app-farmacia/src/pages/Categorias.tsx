@@ -1,20 +1,56 @@
+// Importa React e hooks para estado/efeitos
 import React, { useEffect, useState } from 'react';
+// Importa ícones para botões de ação
+import { FaEdit, FaTrash } from 'react-icons/fa';
+// Importa React Hook Form e resolver Zod
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { categoriaSchema, type CategoriaFormData } from '../schemas/formSchemas';
+
+// Importa componentes compartilhados de layout e UI
 import { Layout } from '../components/Layout';
 import { Loading } from '../components/Loading';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+
+// Serviço para comunicação com o backend referente a categorias
 import { categoriaService } from '../api/categoriaService';
-import { Categoria, CategoriaRequest } from '../types';
+
+// Tipos TypeScript para tipar dados e requisições
+import { Categoria } from '../types';
+
+// Biblioteca de toasts para feedback ao usuário
 import { toast } from 'react-toastify';
+
+// Hook para ordenação de tabelas
 import { useTableSort } from '../hooks/useTableSort';
+
+// Estilos específicos desta página
+import '../styles/shared.css';
+import '../styles/forms.css';
 import './Categorias.css';
 
+// Página de gerenciamento de categorias
 export const Categorias: React.FC = () => {
+  // Lista de categorias exibidas na tabela
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  // Controle de carregamento global da página
   const [loading, setLoading] = useState(true);
+  // Controle de exibição do modal de criação/edição
   const [showModal, setShowModal] = useState(false);
+  // ID da categoria em edição (null se for criação)
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [formData, setFormData] = useState<CategoriaRequest>({ nome: '' });
+  // Controle de envio para desabilitar inputs/botões enquanto salva
   const [submitting, setSubmitting] = useState(false);
+  
+  // React Hook Form setup
+  const { register, handleSubmit: handleFormSubmit, formState: { errors }, reset, setValue } = useForm<CategoriaFormData>({
+    resolver: zodResolver(categoriaSchema),
+    defaultValues: {
+      nome: '',
+    },
+  });
+  
+  // Estado do diálogo de confirmação para deleção
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -27,12 +63,15 @@ export const Categorias: React.FC = () => {
     onConfirm: () => {},
   });
 
+  // Prepara ordenação da tabela de categorias
   const { sortedData, requestSort, getSortIndicator, sortConfig } = useTableSort(categorias);
 
+  // Carrega a lista de categorias quando a página monta
   useEffect(() => {
     loadCategorias();
   }, []);
 
+  // Busca todas as categorias no backend
   const loadCategorias = async () => {
     try {
       setLoading(true);
@@ -46,39 +85,35 @@ export const Categorias: React.FC = () => {
     }
   };
 
+  // Abre o modal para criar/editar categoria
   const handleOpenModal = (categoria?: Categoria) => {
     if (categoria) {
       setEditingId(categoria.id);
-      setFormData({ nome: categoria.nome });
+      setValue('nome', categoria.nome);
     } else {
       setEditingId(null);
-      setFormData({ nome: '' });
+      reset({ nome: '' });
     }
     setShowModal(true);
   };
 
+  // Fecha o modal e reseta o formulário
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingId(null);
-    setFormData({ nome: '' });
+    reset({ nome: '' });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.nome.trim()) {
-      toast.error('O nome da categoria é obrigatório');
-      return;
-    }
-
+  // Salva a categoria (cria ou atualiza)
+  const handleSubmit = async (data: CategoriaFormData) => {
     setSubmitting(true);
 
     try {
       if (editingId) {
-        await categoriaService.update(editingId, formData);
+        await categoriaService.update(editingId, data);
         toast.success('Categoria atualizada com sucesso!');
       } else {
-        await categoriaService.create(formData);
+        await categoriaService.create(data);
         toast.success('Categoria criada com sucesso!');
       }
       handleCloseModal();
@@ -92,6 +127,7 @@ export const Categorias: React.FC = () => {
     }
   };
 
+  // Abre diálogo de confirmação e, se confirmado, deleta a categoria
   const handleDelete = async (id: number, nome: string) => {
     setConfirmDialog({
       isOpen: true,
@@ -114,6 +150,7 @@ export const Categorias: React.FC = () => {
     });
   };
 
+  // Exibe spinner enquanto carrega
   if (loading) {
     return (
       <Layout>
@@ -124,7 +161,9 @@ export const Categorias: React.FC = () => {
 
   return (
     <Layout>
+      {/* Container principal da página */}
       <div className="page-container">
+        {/* Cabeçalho com título e botão para criar nova categoria */}
         <div className="page-header">
           <h1>Categorias</h1>
           <button className="btn btn-primary" onClick={() => handleOpenModal()}>
@@ -132,6 +171,7 @@ export const Categorias: React.FC = () => {
           </button>
         </div>
 
+        {/* Card contendo a tabela de categorias ou uma mensagem de vazio */}
         <div className="card">
           {categorias.length === 0 ? (
             <p className="empty-message">Nenhuma categoria cadastrada.</p>
@@ -140,12 +180,14 @@ export const Categorias: React.FC = () => {
               <table>
                 <thead>
                   <tr>
+                    {/* Cabeçalho ordenável por ID */}
                     <th 
                       className={`sortable${sortConfig.key === 'id' ? ' sorted' : ''}`}
                       onClick={() => requestSort('id')}
                     >
                       ID{getSortIndicator('id')}
                     </th>
+                    {/* Cabeçalho ordenável por Nome */}
                     <th 
                       className={`sortable${sortConfig.key === 'nome' ? ' sorted' : ''}`}
                       onClick={() => requestSort('nome')}
@@ -161,17 +203,21 @@ export const Categorias: React.FC = () => {
                       <td>{categoria.id}</td>
                       <td>{categoria.nome}</td>
                       <td className="text-center">
+                        {/* Botão ícone para abrir modal no modo edição */}
                         <button
-                          className="btn btn-sm btn-secondary"
+                          className="btn-icon btn-icon-edit"
                           onClick={() => handleOpenModal(categoria)}
+                          title="Editar"
                         >
-                          Editar
+                          <FaEdit />
                         </button>
+                        {/* Botão ícone para deletar após confirmação */}
                         <button
-                          className="btn btn-sm btn-danger"
+                          className="btn-icon btn-icon-delete"
                           onClick={() => handleDelete(categoria.id, categoria.nome)}
+                          title="Deletar"
                         >
-                          Deletar
+                          <FaTrash />
                         </button>
                       </td>
                     </tr>
@@ -182,42 +228,59 @@ export const Categorias: React.FC = () => {
           )}
         </div>
 
+        {/* Modal de criação/edição de categoria */}
         {showModal && (
           <div className="modal-overlay" onClick={handleCloseModal}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content modern-modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>{editingId ? 'Editar Categoria' : 'Nova Categoria'}</h2>
                 <button className="btn-close" onClick={handleCloseModal}>
                   ×
                 </button>
               </div>
-              <form onSubmit={handleSubmit}>
-                <div className="form-group">
-                  <label htmlFor="nome">Nome *</label>
-                  <input
-                    type="text"
-                    id="nome"
-                    value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                    placeholder="Ex: Analgésicos"
-                    disabled={submitting}
-                    required
-                  />
-                </div>
+              <div className="modal-body">
+                <form onSubmit={handleFormSubmit(handleSubmit)} className="modern-form">
+                  <div className="form-field">
+                    <label htmlFor="nome" className="form-label form-label-required">
+                      Nome da Categoria
+                    </label>
+                    <input
+                      type="text"
+                      id="nome"
+                      className={`form-input ${errors.nome ? 'form-input-error' : ''}`}
+                      placeholder="Ex: Analgésicos, Antibióticos..."
+                      disabled={submitting}
+                      {...register('nome')}
+                    />
+                    {errors.nome && (
+                      <span className="form-error">{errors.nome.message}</span>
+                    )}
+                  </div>
 
-                <div className="modal-actions">
-                  <button type="button" className="btn btn-secondary" onClick={handleCloseModal} disabled={submitting}>
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={submitting}>
-                    {submitting ? 'Salvando...' : 'Salvar'}
-                  </button>
-                </div>
-              </form>
+                  <div className="form-actions">
+                    <button
+                      type="button"
+                      className="btn-form-secondary"
+                      onClick={handleCloseModal}
+                      disabled={submitting}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className={`btn-form-primary ${submitting ? 'btn-loading' : ''}`}
+                      disabled={submitting}
+                    >
+                      {submitting ? 'Salvando...' : 'Salvar'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         )}
 
+        {/* Diálogo de confirmação para deleção */}
         <ConfirmDialog
           isOpen={confirmDialog.isOpen}
           title={confirmDialog.title}

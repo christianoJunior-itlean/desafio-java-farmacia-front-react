@@ -1,4 +1,4 @@
-/* Vendas - Estilos espec�ficos */
+/* Vendas - Estilos espec�ficos */
 
 .text-success {
   color: var(--success);
@@ -89,7 +89,64 @@
   max-width: 1400px;
 }
 
+/* Detalhes da Venda - Espaçamento entre seções */
+.detalhes-section {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.detalhes-group {
+  flex: 1;
+  background: var(--gray-50);
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  border-left: 4px solid var(--primary);
+}
+
+.detalhes-group h3 {
+  margin: 0 0 1rem 0;
+  color: var(--primary);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detalhes-group p {
+  margin: 0.75rem 0;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.detalhes-group strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
+.detalhes-itens {
+  margin-top: 2rem;
+}
+
+.detalhes-itens h3 {
+  margin: 0 0 1.5rem 0;
+  color: var(--text-primary);
+  font-size: 1.125rem;
+  font-weight: 700;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--primary-light);
+}
+
 @media (max-width: 768px) {
+  .detalhes-section {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
   .items-grid {
     grid-template-columns: 1fr;
   }

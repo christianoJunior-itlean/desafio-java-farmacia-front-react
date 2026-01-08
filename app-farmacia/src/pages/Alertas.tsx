@@ -1,50 +1,84 @@
+// Importa React e hooks para lidar com estado e efeitos
 import React, { useEffect, useState } from 'react';
+
+// Importa o layout padrão da aplicação
 import { Layout } from '../components/Layout';
+
+// Importa o componente de carregamento (spinner)
 import { Loading } from '../components/Loading';
+
+// Importa o serviço responsável por buscar alertas no backend
 import { alertaService } from '../api/alertaService';
+
+// Tipos TypeScript que descrevem a estrutura dos dados de alerta
 import { AlertaEstoqueBaixo, AlertaValidadeProxima } from '../types';
+
+// Biblioteca para exibir notificações (toasts) para o usuário
 import { toast } from 'react-toastify';
+
+// Funções utilitárias para formatar moeda e datas
 import { formatCurrency, formatDate } from '../utils/formatters';
+
+// Hook customizado para ordenar dados em tabelas
 import { useTableSort } from '../hooks/useTableSort';
+
+// Estilos compartilhados de páginas reutilizados aqui
 import '../pages/Categorias.css';
 import '../pages/Dashboard.css';
 
+// Define e exporta a página de Alertas como um componente funcional
 export const Alertas: React.FC = () => {
+  // Estado que armazena alertas de estoque baixo
   const [alertasEstoque, setAlertasEstoque] = useState<AlertaEstoqueBaixo[]>([]);
+  // Estado que armazena alertas de validade próxima/vencida
   const [alertasValidade, setAlertasValidade] = useState<AlertaValidadeProxima[]>([]);
+  // Estado de carregamento para exibir spinner enquanto busca dados
   const [loading, setLoading] = useState(true);
+  // Estado do filtro selecionado pelo usuário (todos, estoque, validade)
   const [filtro, setFiltro] = useState<'todos' | 'estoque' | 'validade'>('todos');
 
   // Preparar dados para os hooks (sempre executar)
+  // Separa os alertas de validade entre vencidos e próximos do vencimento
   const alertasVencidos = alertasValidade.filter((a) => a.diasParaVencer < 0);
   const alertasProximos = alertasValidade.filter((a) => a.diasParaVencer >= 0);
 
   // Hooks para ordenação das três tabelas - SEMPRE na mesma ordem
+  // Hooks de ordenação para cada tabela. Cada hook retorna:
+  // - sortedData: dados ordenados conforme a coluna escolhida
+  // - requestSort: função para alternar a ordenação de uma coluna
+  // - getSortIndicator: indicador visual (↑/↓) da coluna ordenada
   const { sortedData: sortedEstoque, requestSort: requestSortEstoque, getSortIndicator: getSortIndicatorEstoque } = useTableSort(alertasEstoque);
   const { sortedData: sortedVencidos, requestSort: requestSortVencidos, getSortIndicator: getSortIndicatorVencidos } = useTableSort(alertasVencidos);
   const { sortedData: sortedProximos, requestSort: requestSortProximos, getSortIndicator: getSortIndicatorProximos } = useTableSort(alertasProximos);
 
+  // Ao montar a página, carrega os alertas uma única vez
   useEffect(() => {
     loadAlertas();
   }, []);
 
+  // Função que busca os alertas de estoque e validade em paralelo
   const loadAlertas = async () => {
     try {
       setLoading(true);
+      // Executa as duas requisições em paralelo para maior performance
       const [estoque, validade] = await Promise.all([
         alertaService.getEstoqueBaixo(),
         alertaService.getValidadeProxima(),
       ]);
+      // Atualiza estados com os dados recebidos
       setAlertasEstoque(estoque);
       setAlertasValidade(validade);
     } catch (error: any) {
+      // Em caso de erro, loga no console e mostra um toast para o usuário
       console.error('Erro ao carregar alertas:', error);
       toast.error('Erro ao carregar alertas');
     } finally {
+      // Desativa o estado de carregamento independentemente de sucesso ou erro
       setLoading(false);
     }
   };
 
+  // Enquanto os dados estão sendo carregados, exibe o spinner dentro do layout
   if (loading) {
     return (
       <Layout>
@@ -53,12 +87,15 @@ export const Alertas: React.FC = () => {
     );
   }
 
+  // Booleans para controlar quais seções mostrar com base no filtro
   const mostrarEstoque = filtro === 'todos' || filtro === 'estoque';
   const mostrarValidade = filtro === 'todos' || filtro === 'validade';
 
   return (
     <Layout>
+      {/* Container principal da página */}
       <div className="page-container">
+        {/* Cabeçalho com título e botão de atualização */}
         <div className="page-header">
           <h1>Alertas do Sistema</h1>
           <button className="btn btn-secondary" onClick={loadAlertas}>
@@ -66,6 +103,7 @@ export const Alertas: React.FC = () => {
           </button>
         </div>
 
+        {/* Cartão com filtros de exibição */}
         <div className="card">
           <div className="filters">
             <div className="filter-group">
@@ -79,6 +117,7 @@ export const Alertas: React.FC = () => {
           </div>
         </div>
 
+        {/* Cards de resumo com contadores por tipo de alerta */}
         <div className="dashboard-cards">
           <div className="card card-warning">
             <h3>Estoque Baixo</h3>
@@ -99,6 +138,7 @@ export const Alertas: React.FC = () => {
           </div>
         </div>
 
+        {/* Tabela: Alertas de estoque baixo */}
         {mostrarEstoque && alertasEstoque.length > 0 && (
           <div className="card">
             <h2>Alertas de Estoque Baixo</h2>
@@ -143,6 +183,7 @@ export const Alertas: React.FC = () => {
           </div>
         )}
 
+        {/* Tabela: Medicamentos vencidos */}
         {mostrarValidade && alertasVencidos.length > 0 && (
           <div className="card">
             <h2>⚠️ Medicamentos Vencidos</h2>
@@ -187,6 +228,7 @@ export const Alertas: React.FC = () => {
           </div>
         )}
 
+        {/* Tabela: Medicamentos com validade próxima (<= 30 dias) */}
         {mostrarValidade && alertasProximos.length > 0 && (
           <div className="card">
             <h2>📅 Validade Próxima (30 dias)</h2>
@@ -233,6 +275,7 @@ export const Alertas: React.FC = () => {
           </div>
         )}
 
+        {/* Mensagem amigável quando não há alertas */}
         {alertasEstoque.length === 0 && alertasValidade.length === 0 && (
           <div className="card">
             <div className="no-alerts">

@@ -1,17 +1,40 @@
+// Importa React e hooks
 import React, { useEffect, useState } from 'react';
+// Importa ícones para botões de ação
+import { FaEdit, FaTrash, FaToggleOn, FaToggleOff } from 'react-icons/fa';
+// Importa React Hook Form e resolver Zod
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { medicamentoSchema, type MedicamentoFormData } from '../schemas/formSchemas';
+
+// Layout e componentes de UI
 import { Layout } from '../components/Layout';
 import { Loading } from '../components/Loading';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+
+// Serviços de medicamentos e categorias
 import { medicamentoService } from '../api/medicamentoService';
 import { categoriaService } from '../api/categoriaService';
-import { Medicamento, MedicamentoRequest, Categoria } from '../types';
+
+// Tipos de dados e requisições
+import { Medicamento, Categoria } from '../types';
+
+// Toasts e utilitários
 import { toast } from 'react-toastify';
 import { formatCurrency } from '../utils/formatters';
+
+// Hook para ordenação
 import { useTableSort } from '../hooks/useTableSort';
+
+// Estilos compartilhados e específicos
+import '../styles/shared.css';
+import '../styles/forms.css';
 import '../pages/Categorias.css';
 import './Medicamentos.css';
 
+// Página de gestão de medicamentos
 export const Medicamentos: React.FC = () => {
+  // Estados principais
   const [medicamentos, setMedicamentos] = useState<Medicamento[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [filteredMedicamentos, setFilteredMedicamentos] = useState<Medicamento[]>([]);
@@ -22,6 +45,22 @@ export const Medicamentos: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategoria, setFilterCategoria] = useState<number | ''>('');
   const [filterStatus, setFilterStatus] = useState<'todos' | 'ativos' | 'inativos'>('todos');
+  
+  // React Hook Form setup
+  const { register, handleSubmit: handleFormSubmit, formState: { errors }, reset } = useForm<MedicamentoFormData>({
+    resolver: zodResolver(medicamentoSchema),
+    mode: 'onSubmit',
+    defaultValues: {
+      nome: '',
+      dosagem: '',
+      categoriaId: 0,
+      preco: 0,
+      estoqueMinimo: 0,
+      ativo: true,
+    },
+  });
+  
+  // Diálogo de confirmação para alterar status/deletar
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -34,26 +73,21 @@ export const Medicamentos: React.FC = () => {
     onConfirm: () => {},
   });
 
-  const [formData, setFormData] = useState<MedicamentoRequest>({
-    nome: '',
-    descricao: '',
-    dosagem: '',
-    preco: 0,
-    ativo: true,
-    categoriaId: undefined,
-  });
-
+  // Carrega dados iniciais (medicamentos + categorias)
   useEffect(() => {
     loadData();
   }, []);
 
+  // Recalcula a lista filtrada sempre que filtros ou a lista mudar
   useEffect(() => {
     filterMedicamentos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [medicamentos, searchTerm, filterCategoria, filterStatus]);
 
+  // Prepara ordenação para a tabela a partir da lista filtrada
   const { sortedData, requestSort, getSortIndicator, sortConfig } = useTableSort(filteredMedicamentos);
 
+  // Busca medicamentos e categorias em paralelo
   const loadData = async () => {
     try {
       setLoading(true);
@@ -71,6 +105,7 @@ export const Medicamentos: React.FC = () => {
     }
   };
 
+  // Aplica os filtros de busca, categoria e status
   const filterMedicamentos = () => {
     let filtered = [...medicamentos];
 
@@ -98,71 +133,54 @@ export const Medicamentos: React.FC = () => {
     setFilteredMedicamentos(filtered);
   };
 
+  // Abre modal para criar/editar medicamento
   const handleOpenModal = (medicamento?: Medicamento) => {
     if (medicamento) {
       setEditingId(medicamento.id);
-      setFormData({
+      reset({
         nome: medicamento.nome,
-        descricao: medicamento.descricao,
         dosagem: medicamento.dosagem,
         preco: medicamento.preco,
+        estoqueMinimo: medicamento.estoqueMinimo || 0,
+        categoriaId: medicamento.categoria?.id || 0,
         ativo: medicamento.ativo,
-        categoriaId: medicamento.categoria?.id,
       });
     } else {
       setEditingId(null);
-      setFormData({
+      reset({
         nome: '',
-        descricao: '',
         dosagem: '',
         preco: 0,
+        estoqueMinimo: 0,
+        categoriaId: 0,
         ativo: true,
-        categoriaId: undefined,
       });
     }
     setShowModal(true);
   };
 
+  // Fecha modal e reseta formulário
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingId(null);
-    setFormData({
-      nome: '',
-      descricao: '',
-      dosagem: '',
-      preco: 0,
-      ativo: true,
-      categoriaId: undefined,
-    });
+    reset();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validações
-    if (!formData.nome.trim()) {
-      toast.error('O nome do medicamento é obrigatório');
-      return;
-    }
-
-    if (!formData.dosagem.trim()) {
-      toast.error('A dosagem é obrigatória');
-      return;
-    }
-
-    if (formData.preco <= 0) {
-      toast.error('O preço deve ser maior que zero');
-      return;
-    }
-
+  // Cria ou atualiza medicamento com validações
+  const handleSubmit = async (data: MedicamentoFormData) => {
     setSubmitting(true);
 
     try {
+      const payload: any = {
+        ...data,
+        categoriaId: data.categoriaId || undefined,
+      };
+      
       if (editingId) {
-        await medicamentoService.update(editingId, formData);
+        await medicamentoService.update(editingId, payload);
         toast.success('Medicamento atualizado com sucesso!');
       } else {
-        await medicamentoService.create(formData);
+        await medicamentoService.create(payload);
         toast.success('Medicamento criado com sucesso!');
       }
       handleCloseModal();
@@ -176,6 +194,7 @@ export const Medicamentos: React.FC = () => {
     }
   };
 
+  // Abre diálogo para confirmação de alteração de status (ativo/inativo)
   const handleToggleStatus = async (id: number, currentStatus: boolean) => {
     const action = currentStatus ? 'inativar' : 'ativar';
     setConfirmDialog({
@@ -197,6 +216,7 @@ export const Medicamentos: React.FC = () => {
     });
   };
 
+  // Abre diálogo e remove medicamento após confirmação
   const handleDelete = async (id: number, nome: string) => {
     setConfirmDialog({
       isOpen: true,
@@ -217,6 +237,7 @@ export const Medicamentos: React.FC = () => {
     });
   };
 
+  // Mostra loading enquanto carrega dados
   if (loading) {
     return (
       <Layout>
@@ -227,7 +248,9 @@ export const Medicamentos: React.FC = () => {
 
   return (
     <Layout>
+      {/* Container da página de medicamentos */}
       <div className="page-container">
+        {/* Cabeçalho com ação de novo cadastro */}
         <div className="page-header">
           <h1>Medicamentos</h1>
           <button className="btn btn-primary" onClick={() => handleOpenModal()}>
@@ -235,6 +258,7 @@ export const Medicamentos: React.FC = () => {
           </button>
         </div>
 
+        {/* Filtros: busca, categoria e status */}
         <div className="card filters-card">
           <div className="filters">
             <div className="filter-group">
@@ -268,6 +292,7 @@ export const Medicamentos: React.FC = () => {
           </div>
         </div>
 
+        {/* Tabela de medicamentos ou mensagem quando vazia */}
         <div className="card">
           {filteredMedicamentos.length === 0 ? (
             <p className="empty-message">Nenhum medicamento encontrado.</p>
@@ -276,6 +301,7 @@ export const Medicamentos: React.FC = () => {
               <table>
                 <thead>
                   <tr>
+                    {/* Cabeçalhos ordenáveis */}
                     <th 
                       className={`sortable${sortConfig.key === 'id' ? ' sorted' : ''}`}
                       onClick={() => requestSort('id')}
@@ -329,17 +355,26 @@ export const Medicamentos: React.FC = () => {
                         </span>
                       </td>
                       <td className="text-center">
-                        <button className="btn btn-sm btn-secondary" onClick={() => handleOpenModal(medicamento)}>
-                          Editar
+                        <button 
+                          className="btn-icon btn-icon-edit" 
+                          onClick={() => handleOpenModal(medicamento)}
+                          title="Editar"
+                        >
+                          <FaEdit />
                         </button>
                         <button
-                          className={`btn btn-sm ${medicamento.ativo ? 'btn-warning' : 'btn-success'}`}
+                          className={`btn-icon ${medicamento.ativo ? 'btn-icon-toggle-off' : 'btn-icon-toggle-on'}`}
                           onClick={() => handleToggleStatus(medicamento.id, medicamento.ativo)}
+                          title={medicamento.ativo ? 'Inativar' : 'Ativar'}
                         >
-                          {medicamento.ativo ? 'Inativar' : 'Ativar'}
+                          {medicamento.ativo ? <FaToggleOff /> : <FaToggleOn />}
                         </button>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(medicamento.id, medicamento.nome)}>
-                          Deletar
+                        <button 
+                          className="btn-icon btn-icon-delete" 
+                          onClick={() => handleDelete(medicamento.id, medicamento.nome)}
+                          title="Deletar"
+                        >
+                          <FaTrash />
                         </button>
                       </td>
                     </tr>
@@ -350,120 +385,152 @@ export const Medicamentos: React.FC = () => {
           )}
         </div>
 
+        {/* Modal de criação/edição de medicamento */}
         {showModal && (
           <div className="modal-overlay" onClick={handleCloseModal}>
-            <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content modern-modal-large" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>{editingId ? 'Editar Medicamento' : 'Novo Medicamento'}</h2>
                 <button className="btn-close" onClick={handleCloseModal}>
                   ×
                 </button>
               </div>
-              <form onSubmit={handleSubmit}>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="nome">Nome *</label>
-                    <input
-                      type="text"
-                      id="nome"
-                      value={formData.nome}
-                      onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                      placeholder="Ex: Paracetamol"
-                      disabled={submitting}
-                      required
-                    />
+              <div className="modal-body">
+                <form onSubmit={handleFormSubmit(handleSubmit)} className="modern-form">
+                  <div className="form-grid">
+                    <div className="form-field">
+                      <label htmlFor="nome" className="form-label form-label-required">
+                        Nome do Medicamento
+                      </label>
+                      <input
+                        type="text"
+                        id="nome"
+                        className={`form-input ${errors.nome ? 'form-input-error' : ''}`}
+                        placeholder="Ex: Paracetamol, Dipirona..."
+                        disabled={submitting}
+                        {...register('nome')}
+                      />
+                      {errors.nome && (
+                        <span className="form-error">{errors.nome.message}</span>
+                      )}
+                    </div>
+
+                    <div className="form-field">
+                      <label htmlFor="dosagem" className="form-label form-label-required">
+                        Dosagem
+                      </label>
+                      <input
+                        type="text"
+                        id="dosagem"
+                        className={`form-input ${errors.dosagem ? 'form-input-error' : ''}`}
+                        placeholder="Ex: 500mg, 10ml..."
+                        disabled={submitting}
+                        {...register('dosagem')}
+                      />
+                      {errors.dosagem && (
+                        <span className="form-error">{errors.dosagem.message}</span>
+                      )}
+                    </div>
+
+                    <div className="form-field">
+                      <label htmlFor="preco" className="form-label form-label-required">
+                        Preço (R$)
+                      </label>
+                      <input
+                        type="number"
+                        id="preco"
+                        className={`form-input ${errors.preco ? 'form-input-error' : ''}`}
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0.01"
+                        disabled={submitting}
+                        {...register('preco', { valueAsNumber: true })}
+                      />
+                      {errors.preco && (
+                        <span className="form-error">{errors.preco.message}</span>
+                      )}
+                    </div>
+
+                    <div className="form-field">
+                      <label htmlFor="estoqueMinimo" className="form-label form-label-required">
+                        Estoque Mínimo
+                      </label>
+                      <input
+                        type="number"
+                        id="estoqueMinimo"
+                        className={`form-input ${errors.estoqueMinimo ? 'form-input-error' : ''}`}
+                        placeholder="0"
+                        min="0"
+                        disabled={submitting}
+                        {...register('estoqueMinimo', { valueAsNumber: true })}
+                      />
+                      {errors.estoqueMinimo && (
+                        <span className="form-error">{errors.estoqueMinimo.message}</span>
+                      )}
+                    </div>
+
+                    <div className="form-field form-grid-full">
+                      <label htmlFor="categoriaId" className="form-label form-label-required">
+                        Categoria
+                      </label>
+                      <select
+                        id="categoriaId"
+                        className={`form-select ${errors.categoriaId ? 'form-select-error' : ''}`}
+                        disabled={submitting}
+                        {...register('categoriaId', { valueAsNumber: true })}
+                      >
+                        <option value="">Selecione uma categoria</option>
+                        {categorias.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.nome}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.categoriaId && (
+                        <span className="form-error">{errors.categoriaId.message}</span>
+                      )}
+                    </div>
+
+                    <div className="form-field form-grid-full">
+                      <div className="form-checkbox-wrapper">
+                        <input
+                          type="checkbox"
+                          id="ativo"
+                          className="form-checkbox"
+                          disabled={submitting}
+                          {...register('ativo')}
+                        />
+                        <label htmlFor="ativo" className="form-checkbox-label">
+                          Medicamento Ativo
+                        </label>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="form-group">
-                    <label htmlFor="dosagem">Dosagem *</label>
-                    <input
-                      type="text"
-                      id="dosagem"
-                      value={formData.dosagem}
-                      onChange={(e) => setFormData({ ...formData, dosagem: e.target.value })}
-                      placeholder="Ex: 500mg"
-                      disabled={submitting}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="descricao">Descrição</label>
-                  <textarea
-                    id="descricao"
-                    value={formData.descricao}
-                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                    placeholder="Ex: Analgésico e antitérmico"
-                    disabled={submitting}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="preco">Preço (R$) *</label>
-                    <input
-                      type="number"
-                      id="preco"
-                      value={formData.preco}
-                      onChange={(e) => setFormData({ ...formData, preco: parseFloat(e.target.value) || 0 })}
-                      placeholder="0.00"
-                      step="0.01"
-                      min="0.01"
-                      disabled={submitting}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="categoriaId">Categoria</label>
-                    <select
-                      id="categoriaId"
-                      className="form-control"
-                      value={formData.categoriaId || ''}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          categoriaId: e.target.value ? Number(e.target.value) : undefined,
-                        })
-                      }
+                  <div className="form-actions">
+                    <button
+                      type="button"
+                      className="btn-form-secondary"
+                      onClick={handleCloseModal}
                       disabled={submitting}
                     >
-                      <option value="">Selecione uma categoria</option>
-                      {categorias.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={formData.ativo}
-                      onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className={`btn-form-primary ${submitting ? 'btn-loading' : ''}`}
                       disabled={submitting}
-                    />
-                    <span>Ativo</span>
-                  </label>
-                </div>
-
-                <div className="modal-actions">
-                  <button type="button" className="btn btn-secondary" onClick={handleCloseModal} disabled={submitting}>
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={submitting}>
-                    {submitting ? 'Salvando...' : 'Salvar'}
-                  </button>
-                </div>
-              </form>
+                    >
+                      {submitting ? 'Salvando...' : 'Salvar'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         )}
 
+        {/* Confirmação para alterar status/deletar */}
         <ConfirmDialog
           isOpen={confirmDialog.isOpen}
           title={confirmDialog.title}

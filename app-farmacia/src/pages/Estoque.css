@@ -1,4 +1,4 @@
-/* Estoque - Estilos específicos */
+/* Estoque - Estilos especï¿½ficos */
 
 .estoque-controls {
   display: flex;
@@ -13,19 +13,21 @@
 }
 
 .estoque-summary {
-  padding: 1.5rem;
+  padding: 0.875rem 1.25rem;
   background: linear-gradient(135deg, var(--info-light), var(--info));
   color: white;
-  border-radius: var(--radius-xl);
-  margin-bottom: 2rem;
-  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-lg);
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-md);
+  display: inline-block;
 }
 
 .estoque-summary h3 {
-  margin: 0 0 0.5rem 0;
+  margin: 0;
   color: white;
-  font-size: 1.5rem;
-  font-weight: 800;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .alert-info {

@@ -1,20 +1,34 @@
+// Importa React e hook de estado
 import React, { useState } from 'react';
+
+// Navegação e contexto de autenticação
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+
+// Serviço de autenticação e toasts
 import { authService } from '../api/authService';
 import { toast } from 'react-toastify';
+
+// Logo e estilos da tela de login
 import logo from '../logo.svg';
 import './Login.css';
 
+// Tela de Login/Cadastro (alternável)
 export const Login: React.FC = () => {
+  // Alterna entre modo login e cadastro
   const [isLogin, setIsLogin] = useState(true);
+  // Campos de formulário
   const [username, setUsername] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmSenha, setConfirmSenha] = useState('');
+  // Controle de carregamento do submit
   const [loading, setLoading] = useState(false);
+  // Função de login do contexto
   const { login } = useAuth();
+  // Hook para navegação pós-login
   const navigate = useNavigate();
 
+  // Submete o formulário para login ou cadastro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -23,6 +37,7 @@ export const Login: React.FC = () => {
       return;
     }
 
+    // Fluxo de cadastro
     if (!isLogin) {
       if (senha !== confirmSenha) {
         toast.error('As senhas não coincidem');
@@ -55,6 +70,7 @@ export const Login: React.FC = () => {
 
     setLoading(true);
 
+    // Fluxo de login
     try {
       await login({ username, senha });
       toast.success('Login realizado com sucesso!');
@@ -71,6 +87,7 @@ export const Login: React.FC = () => {
     }
   };
 
+  // Alterna entre modo login e cadastro, limpando campos
   const toggleMode = () => {
     setIsLogin(!isLogin);
     setUsername('');
@@ -79,9 +96,12 @@ export const Login: React.FC = () => {
   };
 
   return (
+    // Container da tela de login
     <div className="login-container">
+      {/* Logos de fundo com leve animação/estilo */}
       <img src={logo} className="login-background-logo login-logo-left" alt="React Logo" />
       <img src={logo} className="login-background-logo login-logo-right" alt="React Logo" />
+      {/* Card central com formulário */}
       <div className="login-card">
         <h1>Sistema de Farmácia</h1>
         <h2>{isLogin ? 'Login' : 'Cadastro'}</h2>

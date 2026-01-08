@@ -27,6 +27,7 @@ export interface Medicamento {
   descricao: string;
   dosagem: string;
   preco: number;
+  estoqueMinimo: number;
   ativo: boolean;
   deletado: boolean;
   categoria: Categoria;

@@ -1,42 +1,75 @@
+// Importa React e hooks
 import React, { useEffect, useState } from 'react';
+// Importa React Hook Form e resolver Zod
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { entradaEstoqueSchema, saidaEstoqueSchema, type EntradaEstoqueFormData, type SaidaEstoqueFormData } from '../schemas/formSchemas';
+
+// Layout e componentes de UI
 import { Layout } from '../components/Layout';
 import { Loading } from '../components/Loading';
+
+// Serviços de estoque e medicamentos
 import { estoqueService } from '../api/estoqueService';
 import { medicamentoService } from '../api/medicamentoService';
-import { Estoque, Medicamento, EntradaEstoqueRequest, SaidaEstoqueRequest } from '../types';
+
+// Tipos para dados e requisições desta página
+import { Estoque, Medicamento } from '../types';
+
+// Toasts e utilitários
 import { toast } from 'react-toastify';
-import { formatDate, isFutureDate } from '../utils/formatters';
+import { formatDate } from '../utils/formatters';
+
+// Estilos compartilhados e específicos
+import '../styles/forms.css';
 import '../pages/Categorias.css';
 import './Estoque.css';
 
+// Página de gestão de estoque: entradas e saídas por lote
 export const EstoquePage: React.FC = () => {
+  // Lista de medicamentos (apenas não excluídos)
   const [medicamentos, setMedicamentos] = useState<Medicamento[]>([]);
+  // Lotes de estoque do medicamento selecionado
   const [estoque, setEstoque] = useState<Estoque[]>([]);
+  // Loading inicial e loading específico do estoque
   const [loading, setLoading] = useState(true);
   const [loadingEstoque, setLoadingEstoque] = useState(false);
+  // Medicamento selecionado (id) para consultar/operar estoque
   const [selectedMedicamento, setSelectedMedicamento] = useState<number | ''>('');
+  // Controles dos modais de entrada e saída de estoque
   const [showEntradaModal, setShowEntradaModal] = useState(false);
   const [showSaidaModal, setShowSaidaModal] = useState(false);
+  // Controle de envio de formulários
   const [submitting, setSubmitting] = useState(false);
 
-  const [entradaData, setEntradaData] = useState<EntradaEstoqueRequest>({
-    medicamentoId: 0,
-    quantidade: 0,
-    dataVencimento: '',
-    observacao: '',
+  // React Hook Form setup para entrada de estoque
+  const { register: registerEntrada, handleSubmit: handleEntradaFormSubmit, formState: { errors: entradaErrors }, reset: resetEntrada } = useForm<EntradaEstoqueFormData>({
+    resolver: zodResolver(entradaEstoqueSchema),
+    mode: 'onSubmit',
+    defaultValues: {
+      quantidade: 0,
+      dataVencimento: '',
+      observacao: '',
+    },
   });
 
-  const [saidaData, setSaidaData] = useState<SaidaEstoqueRequest>({
-    medicamentoId: 0,
-    quantidade: 0,
-    dataVencimento: '',
-    observacao: '',
+  // React Hook Form setup para saída de estoque
+  const { register: registerSaida, handleSubmit: handleSaidaFormSubmit, formState: { errors: saidaErrors }, reset: resetSaida } = useForm<SaidaEstoqueFormData>({
+    resolver: zodResolver(saidaEstoqueSchema),
+    mode: 'onSubmit',
+    defaultValues: {
+      quantidade: 0,
+      dataVencimento: '',
+      observacao: '',
+    },
   });
 
+  // Carrega a lista de medicamentos ao montar
   useEffect(() => {
     loadMedicamentos();
   }, []);
 
+  // Toda vez que muda o medicamento selecionado, recarrega seus lotes
   useEffect(() => {
     if (selectedMedicamento) {
       loadEstoque(Number(selectedMedicamento));
@@ -45,6 +78,7 @@ export const EstoquePage: React.FC = () => {
     }
   }, [selectedMedicamento]);
 
+  // Busca medicamentos e filtra os não excluídos
   const loadMedicamentos = async () => {
     try {
       setLoading(true);
@@ -59,6 +93,7 @@ export const EstoquePage: React.FC = () => {
     }
   };
 
+  // Busca lotes de estoque para o medicamento selecionado
   const loadEstoque = async (medicamentoId: number) => {
     try {
       setLoadingEstoque(true);
@@ -73,13 +108,13 @@ export const EstoquePage: React.FC = () => {
     }
   };
 
+  // Abre modal de entrada de estoque (valida seleção do medicamento)
   const handleOpenEntradaModal = () => {
     if (!selectedMedicamento) {
       toast.error('Selecione um medicamento primeiro');
       return;
     }
-    setEntradaData({
-      medicamentoId: Number(selectedMedicamento),
+    resetEntrada({
       quantidade: 0,
       dataVencimento: '',
       observacao: '',
@@ -87,6 +122,7 @@ export const EstoquePage: React.FC = () => {
     setShowEntradaModal(true);
   };
 
+  // Abre modal de saída de estoque, sugerindo o lote mais próximo de vencer (FIFO)
   const handleOpenSaidaModal = () => {
     if (!selectedMedicamento) {
       toast.error('Selecione um medicamento primeiro');
@@ -107,8 +143,7 @@ export const EstoquePage: React.FC = () => {
       dataVencimentoMaisProxima = lotesOrdenados[0].dataVencimento;
     }
     
-    setSaidaData({
-      medicamentoId: Number(selectedMedicamento),
+    resetSaida({
       quantidade: 0,
       dataVencimento: dataVencimentoMaisProxima,
       observacao: '',
@@ -116,28 +151,18 @@ export const EstoquePage: React.FC = () => {
     setShowSaidaModal(true);
   };
 
-  const handleEntradaSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (entradaData.quantidade <= 0) {
-      toast.error('A quantidade deve ser maior que zero');
-      return;
-    }
-
-    if (!entradaData.dataVencimento) {
-      toast.error('A data de vencimento é obrigatória');
-      return;
-    }
-
-    if (!isFutureDate(entradaData.dataVencimento)) {
-      toast.error('A data de vencimento deve ser futura');
-      return;
-    }
-
+  // Registra entrada de estoque
+  const handleEntradaSubmit = async (data: EntradaEstoqueFormData) => {
     setSubmitting(true);
 
     try {
-      const response = await estoqueService.registrarEntrada(entradaData);
+      const requestData = {
+        medicamentoId: Number(selectedMedicamento),
+        quantidade: data.quantidade,
+        dataVencimento: data.dataVencimento,
+        observacao: data.observacao || '',
+      };
+      const response = await estoqueService.registrarEntrada(requestData);
       toast.success(response.message);
       setShowEntradaModal(false);
       loadEstoque(Number(selectedMedicamento));
@@ -150,32 +175,29 @@ export const EstoquePage: React.FC = () => {
     }
   };
 
-  const handleSaidaSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (saidaData.quantidade <= 0) {
-      toast.error('A quantidade deve ser maior que zero');
-      return;
-    }
-
+  // Registra saída de estoque, respeitando limites e FIFO no backend
+  const handleSaidaSubmit = async (data: SaidaEstoqueFormData) => {
     const totalEstoque = Array.isArray(estoque) ? estoque.reduce((sum, e) => sum + e.quantidadeAtual, 0) : 0;
-    if (saidaData.quantidade > totalEstoque) {
+    if (data.quantidade > totalEstoque) {
       toast.error(`Estoque insuficiente. Disponível: ${totalEstoque}`);
       return;
     }
 
     setSubmitting(true);
 
-    console.log('Dados da saída:', saidaData);
-
     try {
-      const response = await estoqueService.registrarSaida(saidaData);
+      const requestData = {
+        medicamentoId: Number(selectedMedicamento),
+        quantidade: data.quantidade,
+        dataVencimento: data.dataVencimento || '',
+        observacao: data.observacao || '',
+      };
+      const response = await estoqueService.registrarSaida(requestData);
       toast.success(response.message);
       setShowSaidaModal(false);
       loadEstoque(Number(selectedMedicamento));
     } catch (error: any) {
       console.error('Erro ao registrar saída:', error);
-      console.error('Detalhes do erro:', error.response?.data);
       const message = error.response?.data?.message || 'Erro ao registrar saída';
       toast.error(message);
     } finally {
@@ -183,6 +205,7 @@ export const EstoquePage: React.FC = () => {
     }
   };
 
+  // Exibe loading inicial
   if (loading) {
     return (
       <Layout>
@@ -191,15 +214,18 @@ export const EstoquePage: React.FC = () => {
     );
   }
 
+  // Soma total de unidades em estoque do medicamento selecionado
   const totalEstoque = Array.isArray(estoque) ? estoque.reduce((sum, e) => sum + e.quantidadeAtual, 0) : 0;
 
   return (
     <Layout>
+      {/* Container principal */}
       <div className="page-container">
         <div className="page-header">
           <h1>Gestão de Estoque</h1>
         </div>
 
+        {/* Card de controles: seleção de medicamento e ações */}
         <div className="card">
           <div className="estoque-controls">
             <div className="form-group">
@@ -231,6 +257,7 @@ export const EstoquePage: React.FC = () => {
           </div>
         </div>
 
+        {/* Se um medicamento está selecionado, mostra o resumo e a tabela de lotes */}
         {selectedMedicamento && (
           <div className="card">
             <div className="estoque-summary">
@@ -292,120 +319,148 @@ export const EstoquePage: React.FC = () => {
           </div>
         )}
 
+        {/* Modal para registrar entrada de estoque */}
         {showEntradaModal && (
           <div className="modal-overlay" onClick={() => setShowEntradaModal(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content modern-modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>Registrar Entrada de Estoque</h2>
                 <button className="btn-close" onClick={() => setShowEntradaModal(false)}>
                   ×
                 </button>
               </div>
-              <form onSubmit={handleEntradaSubmit}>
-                <div className="form-group">
-                  <label htmlFor="quantidade">Quantidade *</label>
-                  <input
-                    type="number"
-                    id="quantidade"
-                    value={entradaData.quantidade || ''}
-                    onChange={(e) => setEntradaData({ ...entradaData, quantidade: parseInt(e.target.value) || 0 })}
-                    min="1"
-                    placeholder="Ex: 100"
-                    disabled={submitting}
-                    required
-                  />
-                </div>
+              <div className="modal-body">
+                <form onSubmit={handleEntradaFormSubmit(handleEntradaSubmit)} className="modern-form">
+                  <div className="form-field">
+                    <label htmlFor="quantidade" className="form-label form-label-required">
+                      Quantidade
+                    </label>
+                    <input
+                      type="number"
+                      id="quantidade"
+                      className={`form-input ${entradaErrors.quantidade ? 'form-input-error' : ''}`}
+                      min="1"
+                      placeholder="Ex: 100"
+                      disabled={submitting}
+                      {...registerEntrada('quantidade', { valueAsNumber: true })}
+                    />
+                    {entradaErrors.quantidade && (
+                      <span className="form-error">{entradaErrors.quantidade.message}</span>
+                    )}
+                  </div>
 
-                <div className="form-group">
-                  <label htmlFor="dataVencimento">Data de Vencimento *</label>
-                  <input
-                    type="date"
-                    id="dataVencimento"
-                    value={entradaData.dataVencimento}
-                    onChange={(e) => setEntradaData({ ...entradaData, dataVencimento: e.target.value })}
-                    disabled={submitting}
-                    required
-                  />
-                  <small>A data deve ser futura</small>
-                </div>
+                  <div className="form-field">
+                    <label htmlFor="dataVencimento" className="form-label form-label-required">
+                      Data de Vencimento
+                    </label>
+                    <input
+                      type="date"
+                      id="dataVencimento"
+                      className={`form-input ${entradaErrors.dataVencimento ? 'form-input-error' : ''}`}
+                      disabled={submitting}
+                      {...registerEntrada('dataVencimento')}
+                    />
+                    {entradaErrors.dataVencimento && (
+                      <span className="form-error">{entradaErrors.dataVencimento.message}</span>
+                    )}
+                    <small style={{ display: 'block', marginTop: '0.25rem', color: '#6b7280' }}>A data deve ser futura</small>
+                  </div>
 
-                <div className="form-group">
-                  <label htmlFor="observacao">Número do Lote (opcional)</label>
-                  <input
-                    type="text"
-                    id="observacao"
-                    value={entradaData.observacao}
-                    onChange={(e) => setEntradaData({ ...entradaData, observacao: e.target.value })}
-                    placeholder="Ex: LOTE-2025-001"
-                    disabled={submitting}
-                  />
-                </div>
+                  <div className="form-field">
+                    <label htmlFor="observacao" className="form-label">
+                      Número do Lote (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      id="observacao"
+                      className={`form-input ${entradaErrors.observacao ? 'form-input-error' : ''}`}
+                      placeholder="Ex: LOTE-2025-001"
+                      disabled={submitting}
+                      {...registerEntrada('observacao')}
+                    />
+                    {entradaErrors.observacao && (
+                      <span className="form-error">{entradaErrors.observacao.message}</span>
+                    )}
+                  </div>
 
-                <div className="modal-actions">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowEntradaModal(false)} disabled={submitting}>
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={submitting}>
-                    {submitting ? 'Registrando...' : 'Registrar Entrada'}
-                  </button>
-                </div>
-              </form>
+                  <div className="modal-actions">
+                    <button type="button" className="btn-form-secondary" onClick={() => setShowEntradaModal(false)} disabled={submitting}>
+                      Cancelar
+                    </button>
+                    <button type="submit" className="btn-form-primary" disabled={submitting}>
+                      {submitting ? 'Registrando...' : 'Registrar Entrada'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         )}
 
+        {/* Modal para registrar saída de estoque */}
         {showSaidaModal && (
           <div className="modal-overlay" onClick={() => setShowSaidaModal(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content modern-modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>Registrar Saída de Estoque</h2>
                 <button className="btn-close" onClick={() => setShowSaidaModal(false)}>
                   ×
                 </button>
               </div>
-              <form onSubmit={handleSaidaSubmit}>
-                <div className="alert-info">
-                  <strong>Estoque disponível:</strong> {totalEstoque} unidades
-                  <br />
-                  <small>A saída será feita automaticamente usando FIFO (primeiro a vencer, primeiro a sair)</small>
-                </div>
+              <div className="modal-body">
+                <form onSubmit={handleSaidaFormSubmit(handleSaidaSubmit)} className="modern-form">
+                  <div className="alert-info" style={{ padding: '1rem', backgroundColor: '#eff6ff', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #bfdbfe' }}>
+                    <strong>Estoque disponível:</strong> {totalEstoque} unidades
+                    <br />
+                    <small style={{ color: '#6b7280' }}>A saída será feita automaticamente usando FIFO (primeiro a vencer, primeiro a sair)</small>
+                  </div>
 
-                <div className="form-group">
-                  <label htmlFor="quantidadeSaida">Quantidade *</label>
-                  <input
-                    type="number"
-                    id="quantidadeSaida"
-                    value={saidaData.quantidade || ''}
-                    onChange={(e) => setSaidaData({ ...saidaData, quantidade: parseInt(e.target.value) || 0 })}
-                    min="1"
-                    max={totalEstoque}
-                    placeholder="Ex: 10"
-                    disabled={submitting}
-                    required
-                  />
-                </div>
+                  <div className="form-field">
+                    <label htmlFor="quantidadeSaida" className="form-label form-label-required">
+                      Quantidade
+                    </label>
+                    <input
+                      type="number"
+                      id="quantidadeSaida"
+                      className={`form-input ${saidaErrors.quantidade ? 'form-input-error' : ''}`}
+                      min="1"
+                      max={totalEstoque}
+                      placeholder="Ex: 10"
+                      disabled={submitting}
+                      {...registerSaida('quantidade', { valueAsNumber: true })}
+                    />
+                    {saidaErrors.quantidade && (
+                      <span className="form-error">{saidaErrors.quantidade.message}</span>
+                    )}
+                  </div>
 
-                <div className="form-group">
-                  <label htmlFor="observacaoSaida">Observação (opcional)</label>
-                  <input
-                    type="text"
-                    id="observacaoSaida"
-                    value={saidaData.observacao}
-                    onChange={(e) => setSaidaData({ ...saidaData, observacao: e.target.value })}
-                    placeholder="Ex: Venda manual, Perda, etc."
-                    disabled={submitting}
-                  />
-                </div>
+                  <div className="form-field">
+                    <label htmlFor="observacaoSaida" className="form-label">
+                      Observação (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      id="observacaoSaida"
+                      className={`form-input ${saidaErrors.observacao ? 'form-input-error' : ''}`}
+                      placeholder="Ex: Venda manual, Perda, etc."
+                      disabled={submitting}
+                      {...registerSaida('observacao')}
+                    />
+                    {saidaErrors.observacao && (
+                      <span className="form-error">{saidaErrors.observacao.message}</span>
+                    )}
+                  </div>
 
-                <div className="modal-actions">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowSaidaModal(false)} disabled={submitting}>
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={submitting}>
-                    {submitting ? 'Registrando...' : 'Registrar Saída'}
-                  </button>
-                </div>
-              </form>
+                  <div className="modal-actions">
+                    <button type="button" className="btn-form-secondary" onClick={() => setShowSaidaModal(false)} disabled={submitting}>
+                      Cancelar
+                    </button>
+                    <button type="submit" className="btn-form-primary" disabled={submitting}>
+                      {submitting ? 'Registrando...' : 'Registrar Saída'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         )}
